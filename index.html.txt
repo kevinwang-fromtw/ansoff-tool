@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>安索夫矩陣策略規劃工具 | Ansoff Matrix Tool</title>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Libraries for Export -->
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Noto Sans TC', 'Roboto', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .quadrant {
+            transition: all 0.3s ease;
+        }
+        .quadrant:hover {
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.05);
+        }
+        /* Custom Scrollbar for textareas */
+        textarea::-webkit-scrollbar {
+            width: 8px;
+        }
+        textarea::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        textarea::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        textarea::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+        
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+            backdrop-filter: blur(2px);
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useEffect } = React;
+
+        // --- Data & Translations ---
+        const TRANSLATIONS = {
+            'zh-TW': {
+                title: "安索夫矩陣策略地圖",
+                subtitle: "企業成長策略規劃工具",
+                products: "產品 (Products)",
+                markets: "市場 (Markets)",
+                existing: "既有 (Existing)",
+                new: "新 (New)",
+                q1_title: "市場滲透 (Market Penetration)",
+                q2_title: "產品開發 (Product Development)",
+                q3_title: "市場開發 (Market Development)",
+                q4_title: "多角化 (Diversification)",
+                q1_ph: "策略重點：\n- 增加既有客戶的使用頻率\n- 吸引競爭對手的客戶\n- 強化行銷與促銷活動...",
+                q2_ph: "策略重點：\n- 為既有市場研發新產品\n- 產品升級或改版\n- 推出互補性產品...",
+                q3_ph: "策略重點：\n- 將既有產品推向新地區\n- 開發新的目標客群\n- 尋找新的銷售通路...",
+                q4_ph: "策略重點：\n- 同時開發新產品與新市場\n- 垂直整合或水平整合\n- 跨足完全不同的產業...",
+                btn_clear: "一鍵清空",
+                btn_img: "匯出圖片",
+                btn_pdf: "匯出 PDF",
+                consult_title: "需要更深入的策略諮詢？",
+                consult_desc: "工具能幫您釐清方向，但執行的細節決定成敗。歡迎與我聯繫，進行一對一的深度企業診斷。",
+                copy_link: "複製工具連結",
+                link_copied: "連結已複製！",
+                explanation_title: "各象限策略簡易說明",
+                explanations: [
+                    { title: "市場滲透", desc: "風險最低。專注於在現有市場中銷售更多現有產品。" },
+                    { title: "產品開發", desc: "中等風險。針對現有客戶群推出新產品或改良產品。" },
+                    { title: "市場開發", desc: "中等風險。將現有的成熟產品推廣到新的地理區域或客群。" },
+                    { title: "多角化", desc: "風險最高。同時進入新市場並銷售新產品，但回報潛力也最大。" }
+                ]
+            },
+            'en': {
+                title: "Ansoff Matrix Strategy Map",
+                subtitle: "Corporate Growth Planning Tool",
+                products: "Products",
+                markets: "Markets",
+                existing: "Existing",
+                new: "New",
+                q1_title: "Market Penetration",
+                q2_title: "Product Development",
+                q3_title: "Market Development",
+                q4_title: "Diversification",
+                q1_ph: "Strategy Focus:\n- Increase usage by existing customers\n- Attract competitors' customers\n- Enhance marketing & promotions...",
+                q2_ph: "Strategy Focus:\n- Develop new products for existing markets\n- Product upgrades\n- Complementary products...",
+                q3_ph: "Strategy Focus:\n- New demographics or geographies\n- New distribution channels\n- Targeting new segments...",
+                q4_ph: "Strategy Focus:\n- New products in new markets\n- Vertical/Horizontal integration\n- Entering new industries...",
+                btn_clear: "Clear All",
+                btn_img: "Export Image",
+                btn_pdf: "Export PDF",
+                consult_title: "Need In-Depth Strategic Consulting?",
+                consult_desc: "Tools help clarify direction, but execution determines success. Contact me for a 1-on-1 deep dive diagnosis.",
+                copy_link: "Share Tool",
+                link_copied: "Copied!",
+                explanation_title: "Quadrant Explanations",
+                explanations: [
+                    { title: "Market Penetration", desc: "Lowest Risk. Selling more existing products to existing markets." },
+                    { title: "Product Development", desc: "Medium Risk. Creating new products for your current customer base." },
+                    { title: "Market Development", desc: "Medium Risk. Taking existing products into new geographical areas or segments." },
+                    { title: "Diversification", desc: "Highest Risk. New products for new markets. High risk, high reward." }
+                ]
+            }
+        };
+
+        const CONTACT_INFO = {
+            email: "kevinwang@zgogo.tw",
+            line: "https://line.me/ti/p/~kevinwang0516",
+            fb: "https://www.facebook.com/harvey.wang.779"
+        };
+
+        // --- Components ---
+
+        function App() {
+            const [lang, setLang] = useState('zh-TW');
+            const [strategies, setStrategies] = useState({
+                q1: '', // Penetration
+                q2: '', // Product Dev
+                q3: '', // Market Dev
+                q4: ''  // Diversification
+            });
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [copyText, setCopyText] = useState('');
+            
+            const chartRef = useRef(null);
+            const t = TRANSLATIONS[lang];
+            const isZh = lang === 'zh-TW';
+
+            useEffect(() => {
+                setCopyText(t.copy_link);
+            }, [lang, t.copy_link]);
+
+            const handleInputChange = (key, value) => {
+                setStrategies(prev => ({ ...prev, [key]: value }));
+            };
+
+            const clearAll = () => {
+                if(confirm(lang === 'zh-TW' ? '確定要清空所有內容嗎？' : 'Are you sure you want to clear all content?')){
+                    setStrategies({ q1: '', q2: '', q3: '', q4: '' });
+                }
+            };
+
+            const downloadImage = async () => {
+                if (!chartRef.current) return;
+                setIsGenerating(true);
+                try {
+                    const canvas = await html2canvas(chartRef.current, {
+                        scale: 2,
+                        backgroundColor: "#ffffff",
+                        useCORS: true
+                    });
+                    const link = document.createElement('a');
+                    link.download = `Ansoff_Matrix_${new Date().toISOString().slice(0,10)}.png`;
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                } catch (err) {
+                    console.error("Image export failed", err);
+                    alert("Export failed. Please try again.");
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            const downloadPDF = async () => {
+                if (!chartRef.current) return;
+                setIsGenerating(true);
+                try {
+                    const canvas = await html2canvas(chartRef.current, {
+                        scale: 2,
+                        backgroundColor: "#ffffff"
+                    });
+                    const imgData = canvas.toDataURL('image/png');
+                    
+                    const { jsPDF } = window.jspdf;
+                    const pdf = new jsPDF('p', 'mm', 'a4');
+                    const pdfWidth = pdf.internal.pageSize.getWidth();
+                    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+                    
+                    pdf.addImage(imgData, 'PNG', 0, 10, pdfWidth, pdfHeight);
+                    pdf.save(`Ansoff_Matrix_${new Date().toISOString().slice(0,10)}.pdf`);
+                } catch (err) {
+                    console.error("PDF export failed", err);
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            const copyToClipboard = () => {
+                navigator.clipboard.writeText(window.location.href).then(() => {
+                    setCopyText(t.link_copied);
+                    setTimeout(() => setCopyText(t.copy_link), 2000);
+                });
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col items-center py-8 px-4 sm:px-6 lg:px-8">
+                    {isGenerating && (
+                        <div className="loading-overlay">
+                            <div className="text-xl font-bold text-gray-700">
+                                <i className="fas fa-spinner fa-spin mr-2"></i> Generating...
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Header Controls */}
+                    <div className="w-full max-w-5xl flex justify-between items-center mb-6">
+                        <h1 className="text-2xl font-bold text-gray-800 hidden sm:block">Ansoff Tool</h1>
+                        <div className="flex gap-3 ml-auto">
+                            <select 
+                                value={lang} 
+                                onChange={(e) => setLang(e.target.value)}
+                                className="bg-white border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            >
+                                <option value="zh-TW">繁體中文</option>
+                                <option value="en">English</option>
+                            </select>
+                            <button onClick={clearAll} className="bg-red-50 text-red-600 px-4 py-2 rounded-md hover:bg-red-100 transition text-sm font-medium">
+                                <i className="fas fa-trash-alt mr-2"></i>{t.btn_clear}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Main Capture Area (The Chart) */}
+                    <div ref={chartRef} id="ansoff-chart" className="w-full max-w-5xl bg-white shadow-xl rounded-xl p-8 border border-gray-100">
+                        
+                        {/* Title Section */}
+                        <div className="text-center mb-8">
+                            <h2 className="text-3xl font-bold text-slate-800 tracking-tight">{t.title}</h2>
+                            <p className="text-slate-500 mt-1">{t.subtitle}</p>
+                        </div>
+
+                        {/* The Matrix Layout */}
+                        <div className="relative grid grid-cols-[auto_1fr_1fr] grid-rows-[auto_1fr_1fr] gap-4">
+                            
+                            {/* Empty Top-Left */}
+                            <div className="p-2"></div>
+
+                            {/* X-Axis Labels */}
+                            <div className="text-center font-bold text-gray-600 bg-gray-50 rounded-lg p-2 border border-gray-200">
+                                {t.existing} {t.products}
+                            </div>
+                            <div className="text-center font-bold text-gray-600 bg-gray-50 rounded-lg p-2 border border-gray-200">
+                                {t.new} {t.products}
+                            </div>
+
+                            {/* Y-Axis Label 1 (FIXED) */}
+                            <div 
+                                className="flex items-center justify-center font-bold text-gray-600 bg-gray-50 rounded-lg p-2 border border-gray-200" 
+                                style={{ writingMode: isZh ? 'vertical-rl' : 'vertical-lr' }}
+                            >
+                                <span className={isZh ? "tracking-widest" : "rotate-180"}>
+                                    {t.existing}
+                                    {isZh ? <br/> : " "}
+                                    {t.markets}
+                                </span>
+                            </div>
+
+                            {/* Quadrant 1 */}
+                            <div className="quadrant bg-emerald-50 border-2 border-emerald-100 rounded-xl p-4 flex flex-col h-64 sm:h-80 relative group">
+                                <div className="absolute top-0 right-0 bg-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-bl-lg rounded-tr-lg z-10">
+                                    {t.q1_title}
+                                </div>
+                                <textarea 
+                                    className="w-full h-full bg-transparent resize-none focus:outline-none text-gray-700 text-sm sm:text-base leading-relaxed p-2 mt-4"
+                                    placeholder={t.q1_ph}
+                                    value={strategies.q1}
+                                    onChange={(e) => handleInputChange('q1', e.target.value)}
+                                />
+                            </div>
+
+                            {/* Quadrant 2 */}
+                            <div className="quadrant bg-blue-50 border-2 border-blue-100 rounded-xl p-4 flex flex-col h-64 sm:h-80 relative group">
+                                <div className="absolute top-0 right-0 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-bl-lg rounded-tr-lg z-10">
+                                    {t.q2_title}
+                                </div>
+                                <textarea 
+                                    className="w-full h-full bg-transparent resize-none focus:outline-none text-gray-700 text-sm sm:text-base leading-relaxed p-2 mt-4"
+                                    placeholder={t.q2_ph}
+                                    value={strategies.q2}
+                                    onChange={(e) => handleInputChange('q2', e.target.value)}
+                                />
+                            </div>
+
+                            {/* Y-Axis Label 2 (FIXED) */}
+                            <div 
+                                className="flex items-center justify-center font-bold text-gray-600 bg-gray-50 rounded-lg p-2 border border-gray-200" 
+                                style={{ writingMode: isZh ? 'vertical-rl' : 'vertical-lr' }}
+                            >
+                                <span className={isZh ? "tracking-widest" : "rotate-180"}>
+                                    {t.new}
+                                    {isZh ? <br/> : " "}
+                                    {t.markets}
+                                </span>
+                            </div>
+
+                            {/* Quadrant 3 */}
+                            <div className="quadrant bg-orange-50 border-2 border-orange-100 rounded-xl p-4 flex flex-col h-64 sm:h-80 relative group">
+                                <div className="absolute top-0 right-0 bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg rounded-tr-lg z-10">
+                                    {t.q3_title}
+                                </div>
+                                <textarea 
+                                    className="w-full h-full bg-transparent resize-none focus:outline-none text-gray-700 text-sm sm:text-base leading-relaxed p-2 mt-4"
+                                    placeholder={t.q3_ph}
+                                    value={strategies.q3}
+                                    onChange={(e) => handleInputChange('q3', e.target.value)}
+                                />
+                            </div>
+
+                            {/* Quadrant 4 */}
+                            <div className="quadrant bg-purple-50 border-2 border-purple-100 rounded-xl p-4 flex flex-col h-64 sm:h-80 relative group">
+                                <div className="absolute top-0 right-0 bg-purple-600 text-white text-xs font-bold px-3 py-1 rounded-bl-lg rounded-tr-lg z-10">
+                                    {t.q4_title}
+                                </div>
+                                <textarea 
+                                    className="w-full h-full bg-transparent resize-none focus:outline-none text-gray-700 text-sm sm:text-base leading-relaxed p-2 mt-4"
+                                    placeholder={t.q4_ph}
+                                    value={strategies.q4}
+                                    onChange={(e) => handleInputChange('q4', e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Explanations */}
+                        <div className="mt-8 border-t border-gray-100 pt-6">
+                            <h3 className="text-gray-800 font-bold mb-4 flex items-center">
+                                <i className="fas fa-info-circle text-indigo-500 mr-2"></i>
+                                {t.explanation_title}
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
+                                {t.explanations.map((item, idx) => (
+                                    <div key={idx} className="bg-gray-50 p-3 rounded hover:bg-gray-100 transition">
+                                        <span className="font-bold text-gray-800">{item.title}</span>: {item.desc}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Footer Contact */}
+                        <div className="mt-10 bg-gradient-to-r from-slate-800 to-slate-900 rounded-lg p-6 text-white relative overflow-hidden">
+                            <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+                                <div className="text-center md:text-left">
+                                    <h4 className="font-bold text-lg text-yellow-400 mb-1">{t.consult_title}</h4>
+                                    <p className="text-slate-300 text-sm max-w-md">{t.consult_desc}</p>
+                                </div>
+                                <div className="flex gap-4">
+                                    <a href={`mailto:${CONTACT_INFO.email}`} title="Email" className="flex items-center justify-center w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 transition backdrop-blur-sm text-white border border-white/10">
+                                        <i className="fas fa-envelope"></i>
+                                    </a>
+                                    <a href={CONTACT_INFO.line} target="_blank" rel="noopener noreferrer" title="Line" className="flex items-center justify-center w-10 h-10 rounded-full bg-[#00B900]/20 hover:bg-[#00B900]/40 transition backdrop-blur-sm text-[#00B900] border border-[#00B900]/30 font-bold">
+                                        <i className="fab fa-line text-lg"></i>
+                                    </a>
+                                    <a href={CONTACT_INFO.fb} target="_blank" rel="noopener noreferrer" title="Facebook" className="flex items-center justify-center w-10 h-10 rounded-full bg-[#1877F2]/20 hover:bg-[#1877F2]/40 transition backdrop-blur-sm text-[#1877F2] border border-[#1877F2]/30">
+                                        <i className="fab fa-facebook-f"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Buttons */}
+                    <div className="w-full max-w-5xl mt-8 flex flex-wrap justify-center gap-4">
+                        <button onClick={downloadImage} className="flex items-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-full shadow-lg hover:shadow-xl transition transform hover:-translate-y-1">
+                            <i className="fas fa-image mr-2"></i> {t.btn_img}
+                        </button>
+                        <button onClick={downloadPDF} className="flex items-center bg-gray-800 hover:bg-gray-900 text-white font-bold py-3 px-6 rounded-full shadow-lg hover:shadow-xl transition transform hover:-translate-y-1">
+                            <i className="fas fa-file-pdf mr-2"></i> {t.btn_pdf}
+                        </button>
+                        <button onClick={copyToClipboard} className="flex items-center bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-bold py-3 px-6 rounded-full shadow-md hover:shadow-lg transition transform hover:-translate-y-1">
+                            <i className="fas fa-share-alt mr-2"></i> {copyText}
+                        </button>
+                    </div>
+
+                    <div className="mt-8 text-center text-gray-400 text-xs">
+                        &copy; {new Date().getFullYear()} Strategy Tool. Designed for Business Excellence.
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
